@@ -1,4 +1,10 @@
-use std::{env};
+use std::env;
+use std::sync::Mutex;
+use itertools::Itertools;
+
+lazy_static::lazy_static! {
+    static ref USER_INPUT: Mutex<String> = Mutex::new(String::new());
+}
 
 #[derive(Debug, PartialEq)]
 enum TokenKind {
@@ -20,7 +26,8 @@ impl Token {
 
     fn expect_number(&self, idx: &mut usize) -> i32 {
         if self.kind != TokenKind::TkNum {
-            panic!("数ではありません")
+            let user_input = USER_INPUT.lock().unwrap().clone();
+            error_at(*idx, user_input, "数ではありません");
         }
 
         *idx += 1;
@@ -29,7 +36,8 @@ impl Token {
 
     fn expect(&self, idx: &mut usize, op: String) {
         if self.kind != TokenKind::TkReserved || self.str != op {
-            panic!("{op}ではありません")
+            let user_input = USER_INPUT.lock().unwrap().clone();
+            error_at(*idx, user_input, &format!("{op}ではありません"));
         }
 
         *idx += 1;
@@ -71,7 +79,9 @@ fn tokenize(p: &Vec<char>) -> Vec<Token> {
                 tokens.push(new_token);
             }
             _ => {
-                panic!("予期しない文字です: '{}'", p[idx]);
+                let user_input = USER_INPUT.lock().unwrap().clone();
+                error_at(idx, user_input, &format!("予期しない文字です: '{}'", p[idx]));
+                panic!();
             }
         }
     }
@@ -105,7 +115,11 @@ fn get_args() -> Result<Vec<String>, String> {
 
 fn main() {
     let p = match get_args() {
-        Ok(v) => v[1].chars().collect::<Vec<char>>(),
+        Ok(v) => {
+            let mut user_input = USER_INPUT.lock().unwrap();
+            *user_input = v[1].clone();
+            v[1].chars().collect::<Vec<char>>()
+        },
         Err(msg) => {panic!("{}", msg);}
     };
 
@@ -130,4 +144,13 @@ fn main() {
     }
 
     println!("  ret");
+}
+
+fn error_at(idx: usize, user_input: String, reason: &str) {
+    eprintln!("{}", user_input);
+    eprintln!("{}^ {}",
+        (0..idx).into_iter().map(|_| " ").join(""),
+        reason
+    );
+    panic!();
 }
