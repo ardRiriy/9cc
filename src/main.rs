@@ -7,7 +7,7 @@ fn main() {
     };
 
     println!(".intel_syntax noprefix");
-    println!(".global _main");
+    println!(".globl _main");
     println!("_main:");
     println!("  mov rax, {}", args[1]);
     println!("  ret");
