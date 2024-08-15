@@ -34,7 +34,7 @@ impl Token {
         self.val.unwrap()
     }
 
-    fn expect(&self, idx: &mut usize, op: String) {
+    fn expect(&self, idx: &mut usize, op: &str) {
         if self.kind != TokenKind::TkReserved || self.str != op {
             let user_input = USER_INPUT.lock().unwrap().clone();
             error_at(*idx, user_input, &format!("{op}ではありません"));
@@ -43,7 +43,7 @@ impl Token {
         *idx += 1;
     }
 
-    fn consume(&self, idx: &mut usize, op: String) -> bool {
+    fn consume(&self, idx: &mut usize, op: &str) -> bool {
         if self.kind != TokenKind::TkReserved || self.str != op {
             return false;
         }
@@ -57,7 +57,7 @@ fn tokenize(p: &Vec<char>) -> Vec<Token> {
     let mut idx = 0;
     while idx < p.len() {
         match p[idx] {
-            '+' | '-' => {
+            '+' | '-' | '*' | '/' | '(' | ')' => {
                 let new_token = Token::new(
                     TokenKind::TkReserved,
                     format!("{}", p[idx]),
@@ -87,6 +87,178 @@ fn tokenize(p: &Vec<char>) -> Vec<Token> {
     }
     tokens
 }
+
+#[derive(Debug, PartialEq)]
+enum NodeKind {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Num,
+}
+
+#[derive(Debug)]
+struct Node {
+    kind: NodeKind,
+    lhs: usize, // 配列上のindex
+    rhs: usize, // 配列上のindex
+    val: Option<i32>,
+}
+
+impl Node {
+    fn new(kind: NodeKind, lhs: usize, rhs: usize, val: Option<i32>) -> Node {
+        Node { kind, lhs, rhs, val }
+    }
+}
+
+struct NodeTree {
+    tokens: Vec<Token>,
+    read: usize, // 読んだトークン数
+    node_tree: Vec<Node>
+}
+
+impl NodeTree {
+    fn new(tokens: Vec<Token>) -> NodeTree {
+        NodeTree { tokens, node_tree: vec![], read: 0 }
+    }
+
+    fn parse(&mut self) {
+        let loc = self.expr();
+        self.generate(loc);
+    }
+
+    fn generate(&mut self, loc: usize) {
+        if self.node_tree[loc].kind == NodeKind::Num {
+            println!("  push {}", self.node_tree[loc].val.unwrap());
+            return;
+        }
+
+        self.generate(self.node_tree[loc].lhs);
+        self.generate(self.node_tree[loc].rhs);
+        println!("  pop rdi");
+        println!("  pop rax");
+
+        match self.node_tree[loc].kind {
+            NodeKind::Add => {
+                println!("  add rax, rdi");
+            },
+            NodeKind::Sub => {
+                println!("  sub rax, rdi");
+            },
+            NodeKind::Mul => {
+                println!("  imul rax, rdi");
+            },
+            NodeKind::Div => {
+                println!("  cqo");
+                println!("  idiv rdi");
+            },
+            _ => {
+                unreachable!();
+            }
+        }
+
+        println!("  push rax");
+    }
+
+    fn expr(&mut self) -> usize {
+        let mut node = self.mul();
+        while self.read < self.tokens.len() {
+            if self.tokens[self.read].consume(&mut self.read, "+") {
+                let new_node = Node::new(
+                    NodeKind::Add,
+                    node,
+                    self.mul(),
+                    None
+                );
+                self.node_tree.push(new_node);
+                eprintln!("{}\n", self.node_tree.iter().map(|node| format!("{:?}", *node)).join(",\n"));
+                node = self.node_tree.len() - 1;
+            } else if self.tokens[self.read].consume(&mut self.read, "-") {
+                let new_node = Node::new(
+                    NodeKind::Sub,
+                    node,
+                    self.mul(),
+                    None
+                );
+                self.node_tree.push(new_node);
+                node = self.node_tree.len() - 1;
+            } else {
+                return node;
+            }
+        }
+        node
+    }
+
+    fn mul(&mut self) -> usize {
+        let mut node = self.unary();
+        while self.read < self.tokens.len() {
+            if self.tokens[self.read].consume(&mut self.read, "*") {
+                let new_node = Node::new(
+                    NodeKind::Mul,
+                    node,
+                    self.unary(),
+                    None,
+                );
+                self.node_tree.push(new_node);
+                node = self.node_tree.len() - 1;
+            } else if self.tokens[self.read].consume(&mut self.read, "/") {
+                let new_node = Node::new(
+                    NodeKind::Div,
+                    node,
+                    self.unary(),
+                    None,
+                );
+                self.node_tree.push(new_node);
+                node = self.node_tree.len() - 1;
+            } else {
+                return node;
+            }
+        }
+        node
+    }
+
+    fn unary(&mut self) -> usize {
+        if self.tokens[self.read].consume(&mut self.read, "+") {
+            return self.primary();
+        } else if self.tokens[self.read].consume(&mut self.read, "-") {
+            // -x は 0 - xとして取り扱う
+            let inf = 1e10 as usize;
+            let zero_node = Node::new(NodeKind::Num, inf, inf, Some(0));
+            self.node_tree.push(zero_node);
+            let new_node = Node::new(
+                NodeKind::Sub,
+                self.node_tree.len()-1,
+                self.primary(),
+                None
+            );
+            self.node_tree.push(new_node);
+            return self.node_tree.len() - 1;
+        }
+
+        return self.primary();
+    }
+
+    fn primary(&mut self) -> usize {
+        if self.tokens[self.read].consume(&mut self.read, "(") {
+            let idx = self.expr();
+            self.tokens[self.read].expect(&mut self.read, ")");
+            return idx;
+        }
+
+        // 実装ミスっていたら配列外参照で落ちるようにしておく
+        let inf = 1e10 as usize;
+        let new_node = Node::new(
+            NodeKind::Num,
+            inf,
+            inf,
+            Some(self.tokens[self.read].expect_number(&mut self.read))
+        );
+        self.node_tree.push(new_node);
+        eprintln!("{}\n", self.node_tree.iter().map(|node| format!("{:?}", *node)).join(",\n"));
+        return self.node_tree.len() - 1;
+    }
+}
+
 
 // p[idx]から違う記号が出てくるまでを数字として返す
 fn strtol(p: &[char], idx: &mut usize) -> i32 {
@@ -128,21 +300,11 @@ fn main() {
     println!("_main:");
 
     let tokens = tokenize(&p);
+    let mut node_tree = NodeTree::new(tokens);
+    node_tree.parse();
 
-    // 最初の項を処理
-    let mut idx = 0;
-    println!("  mov rax, {}", tokens[0].expect_number(&mut idx));
-
-    while idx < tokens.len() {
-        if tokens[idx].consume(&mut idx, "+".to_string()) {
-            println!("  add rax, {}", tokens[idx].expect_number(&mut idx));
-            continue;
-        }
-
-        tokens[idx].expect(&mut idx, "-".to_string());
-        println!("  sub rax, {}", tokens[idx].expect_number(&mut idx));
-    }
-
+    // スタックトップの値を関数からの戻り値とする
+    println!("  pop rax");
     println!("  ret");
 }
 
