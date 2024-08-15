@@ -89,7 +89,7 @@ fn tokenize(p: &Vec<char>) -> Vec<Token> {
 }
 
 // p[idx]から違う記号が出てくるまでを数字として返す
-fn strtol(p: &Vec<char>, idx: &mut usize) -> i32 {
+fn strtol(p: &[char], idx: &mut usize) -> i32 {
     let mut num = 0;
     while *idx < p.len() {
         match p[*idx] {
@@ -149,7 +149,7 @@ fn main() {
 fn error_at(idx: usize, user_input: String, reason: &str) {
     eprintln!("{}", user_input);
     eprintln!("{}^ {}",
-        (0..idx).into_iter().map(|_| " ").join(""),
+        (0..idx).map(|_| " ").join(""),
         reason
     );
     panic!();
