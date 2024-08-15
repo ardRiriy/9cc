@@ -1,4 +1,4 @@
-use std::{env, process::exit};
+use std::env;
 
 fn main() {
     let args = match get_args() {
@@ -7,10 +7,10 @@ fn main() {
     };
 
     println!(".intel_syntax noprefix");
-    println!(".globl main");
-    println!("main:");
-
-
+    println!(".global _main");
+    println!("_main:");
+    println!("  mov rax, {}", args[1]);
+    println!("  ret");
 }
 
 fn get_args() -> Result<Vec<String>, String> {
@@ -18,5 +18,5 @@ fn get_args() -> Result<Vec<String>, String> {
     if args.len() != 2 {
         return Err(String::from("引数の個数が正しくありません"));
     }
-    return Ok(args);
+    Ok(args)
 }

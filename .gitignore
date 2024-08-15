@@ -1,1 +1,7 @@
 /target
+
+*~
+*.o
+tmp*
+a.out
+9cc
