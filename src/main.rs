@@ -78,6 +78,26 @@ fn tokenize(p: &Vec<char>) -> Vec<Token> {
                 new_token.val = Some(num);
                 tokens.push(new_token);
             }
+            '<' | '=' | '>' | '!'  => {
+                if idx + 1 < p.len() {
+                    if p[idx+1] == '=' {
+                        let op = p[idx..=idx+1].iter().join("");
+                        let new_token = Token::new(
+                            TokenKind::TkReserved,
+                            op
+                        );
+                        tokens.push(new_token);
+                        idx += 2;
+                        continue;
+                    }
+                    let new_token = Token::new(
+                        TokenKind::TkReserved,
+                        format!("{}", p[idx])
+                    );
+                    tokens.push(new_token);
+                    idx += 1;
+                }
+            }
             _ => {
                 let user_input = USER_INPUT.lock().unwrap().clone();
                 error_at(idx, user_input, &format!("予期しない文字です: '{}'", p[idx]));
@@ -95,6 +115,10 @@ enum NodeKind {
     Mul,
     Div,
     Num,
+    Eq,
+    Nq,
+    Le, // <=
+    Lt, // <
 }
 
 #[derive(Debug)]
@@ -152,6 +176,26 @@ impl NodeTree {
                 println!("  cqo");
                 println!("  idiv rdi");
             },
+            NodeKind::Eq => {
+                println!("  cmp rax, rdi");
+                println!("  sete al");
+                println!("  movzx rax, al");
+            },
+            NodeKind::Nq => {
+                println!("  cmp rax, rdi");
+                println!("  setne al");
+                println!("  movzx rax, al");
+            },
+            NodeKind::Lt => {
+                println!("  cmp rax, rdi");
+                println!("  setl al");
+                println!("  movzx rax, al");
+            },
+            NodeKind::Le => {
+                println!("  cmp rax, rdi");
+                println!("  setle al");
+                println!("  movzx rax, al");
+            }
             _ => {
                 unreachable!();
             }
@@ -161,6 +205,90 @@ impl NodeTree {
     }
 
     fn expr(&mut self) -> usize {
+        self.equality()
+    }
+
+    fn equality(&mut self) -> usize {
+        // ==, !=
+        let mut node = self.relational();
+
+        while self.read < self.tokens.len() {
+            if self.tokens[self.read].consume(&mut self.read, "==") {
+                let new_node = Node::new(
+                    NodeKind::Eq,
+                    node,
+                    self.relational(),
+                    None
+                );
+                self.node_tree.push(new_node);
+                node = self.node_tree.len() - 1;
+            } else if self.tokens[self.read].consume(&mut self.read, "!=") {
+                let new_node = Node::new(
+                    NodeKind::Nq,
+                    node,
+                    self.relational(),
+                    None
+                );
+                self.node_tree.push(new_node);
+                node = self.node_tree.len() - 1;
+            } else {
+                return node;
+            }
+        }
+        node
+    }
+
+    fn relational(&mut self) -> usize {
+        // <, <=, >, >=
+        let mut node = self.add();
+
+        while self.read < self.tokens.len() {
+            if self.tokens[self.read].consume(&mut self.read, "<") {
+                let new_node = Node::new(
+                    NodeKind::Lt,
+                    node,
+                    self.add(),
+                    None
+                );
+                self.node_tree.push(new_node);
+                node = self.node_tree.len() - 1;
+            } else if self.tokens[self.read].consume(&mut self.read, "<=") {
+                let new_node = Node::new(
+                    NodeKind::Le,
+                    node,
+                    self.add(),
+                    None
+                );
+                self.node_tree.push(new_node);
+                node = self.node_tree.len() - 1;
+            } else if self.tokens[self.read].consume(&mut self.read, ">") {
+                // 左辺と右辺を入れ替えて評価することでgenの実装量が減って嬉しい(>= も同様)
+                let new_node = Node::new(
+                    NodeKind::Lt,
+                    self.add(),
+                    node,
+                    None
+                );
+                self.node_tree.push(new_node);
+                node = self.node_tree.len() - 1;
+            } else if self.tokens[self.read].consume(&mut self.read, ">=") {
+                let new_node = Node::new(
+                    NodeKind::Le,
+                    self.add(),
+                    node,
+                    None
+                );
+                self.node_tree.push(new_node);
+                node = self.node_tree.len() - 1;
+            } else {
+                return node;
+            }
+        }
+
+        return node;
+    }
+
+    fn add(&mut self) -> usize {
         let mut node = self.mul();
         while self.read < self.tokens.len() {
             if self.tokens[self.read].consume(&mut self.read, "+") {
