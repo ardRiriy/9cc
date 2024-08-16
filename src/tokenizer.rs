@@ -1,4 +1,4 @@
-use crate::utils::{error_at, strtol, USER_INPUT};
+use crate::utils::{error_at, get_keyword, strtol, USER_INPUT};
 use itertools::Itertools;
 
 #[derive(Debug, PartialEq)]
@@ -6,6 +6,7 @@ pub enum TokenKind {
     Reserved,
     Ident,
     Num,
+    Return,
 }
 
 #[derive(Debug)]
@@ -50,6 +51,14 @@ impl Token {
         *idx += 1;
         true
     }
+
+    pub fn consume_return(&self, idx: &mut usize) -> bool {
+        if self.kind != TokenKind::Return{
+            return false;
+        }
+        *idx += 1;
+        true
+    }
 }
 
 pub fn tokenize(p: &[char]) -> Vec<Token> {
@@ -87,18 +96,13 @@ pub fn tokenize(p: &[char]) -> Vec<Token> {
                 }
             }
             'a'..='z' | 'A'..='Z' | '_' => {
-                let mut last = idx + 1;
-                while last < p.len()
-                    && (p[last].is_ascii_lowercase()
-                        || p[last].is_ascii_uppercase()
-                        || p[last] == '_')
-                {
-                    last += 1;
-                }
-                let var = p[idx..last].iter().collect::<String>();
-                let new_token = Token::new(TokenKind::Ident, var.to_string());
+                let var = get_keyword(p, &mut idx);
+
+                let new_token = match var.as_str() {
+                    "return" => Token::new(TokenKind::Return, var),
+                    _ => Token::new(TokenKind::Ident, var),
+                };
                 tokens.push(new_token);
-                idx = last;
             }
             _ => {
                 let user_input = USER_INPUT.lock().unwrap().clone();

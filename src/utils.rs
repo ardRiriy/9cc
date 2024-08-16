@@ -12,6 +12,22 @@ pub fn error_at(idx: usize, user_input: String, reason: &str) {
     panic!();
 }
 
+pub fn get_keyword(p: &[char], idx: &mut usize) -> String {
+    let mut last = *idx + 1;
+    while *idx < p.len()
+        && (p[last].is_lowercase()
+            || p[last].is_uppercase()
+            || p[last].is_numeric()
+            || p[last] == '_')
+    {
+        last += 1;
+    }
+
+    let var = p[*idx..last].iter().collect::<String>();
+    *idx = last;
+    var
+}
+
 // p[idx]から違う記号が出てくるまでを数字として返す
 pub fn strtol(p: &[char], idx: &mut usize) -> i32 {
     let mut num = 0;

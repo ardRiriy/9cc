@@ -5,6 +5,8 @@ use itertools::Itertools;
 use crate::localvar::LVar;
 use crate::tokenizer::{Token, TokenKind};
 
+static INF: usize = 1e10 as usize;
+
 #[derive(Debug, PartialEq)]
 enum NodeKind {
     Add,
@@ -18,6 +20,7 @@ enum NodeKind {
     Lt, // <
     Assign,
     LocalVar,
+    Return,
 }
 
 #[derive(Debug)]
@@ -70,12 +73,12 @@ impl NodeTree {
         println!("  push rbp");
         println!("  mov rbp, rsp");
         println!("  sub rsp, {}", self.offset);
-        // eprintln!("[{}]\n",
-        //     self.nodes.iter().enumerate().map(|(idx, node)| format!("{idx}: {:?}", *node)).join("\n")
-        // );
+        eprintln!("[{}]\n",
+            self.nodes.iter().enumerate().map(|(idx, node)| format!("{idx}: {:?}", *node)).join("\n")
+        );
 
         for &loc in &self.start_nodes.clone() {
-            // eprintln!("start at: {loc}");
+            eprintln!("start at: {loc}");
             self.generate(loc);
             println!("  pop rax"); // 最後に評価した値がスタックに残るので、popしておく
         }
@@ -113,6 +116,15 @@ impl NodeTree {
                 println!("  pop rax");
                 println!("  mov [rax], rdi");
                 println!("  push rdi");
+                return;
+            }
+            NodeKind::Return => {
+                self.generate(self.nodes[loc].rhs);
+                println!("  pop rax");
+                // returnが来たら終了処理をする
+                println!("  mov rsp, rbp");
+                println!("  pop rbp");
+                println!("  ret");
                 return;
             }
             _ => {}
@@ -173,6 +185,13 @@ impl NodeTree {
     }
 
     fn stmt(&mut self) -> usize {
+        if self.tokens[self.read].consume_return(&mut self.read) {
+            let new_node = Node::new(NodeKind::Return, INF, self.expr(), None, 0);
+            self.nodes.push(new_node);
+            self.tokens[self.read].expect(&mut self.read, ";");
+            return self.nodes.len() - 1;
+        }
+
         let node = self.expr();
         self.tokens[self.read].expect(&mut self.read, ";");
         node
@@ -283,8 +302,7 @@ impl NodeTree {
             return self.primary();
         } else if self.tokens[self.read].consume(&mut self.read, "-") {
             // -x は 0 - xとして取り扱う
-            let inf = 1e10 as usize;
-            let zero_node = Node::new(NodeKind::Num, inf, inf, Some(0), 0);
+            let zero_node = Node::new(NodeKind::Num, INF, INF, Some(0), 0);
             self.nodes.push(zero_node);
             let new_node = Node::new(NodeKind::Sub, self.nodes.len() - 1, self.primary(), None, 0);
             self.nodes.push(new_node);
@@ -301,9 +319,6 @@ impl NodeTree {
             return idx;
         }
 
-        // 実装ミスっていたら配列外参照で落ちるようにしておく
-        let inf = 1e10 as usize;
-
         if self.tokens[self.read].kind == TokenKind::Ident {
             // 変数の場合
             let var_name = self.tokens[self.read].str.clone();
@@ -316,15 +331,15 @@ impl NodeTree {
                     new_var.offset
                 }
             };
-            let new_node = Node::new(NodeKind::LocalVar, inf, inf, None, offset);
+            let new_node = Node::new(NodeKind::LocalVar, INF, INF, None, offset);
             self.read += 1; // TODO: ここもっといい実装ある気がするけど一旦放置で
             self.nodes.push(new_node);
         } else {
             // 数字の場合
             let new_node = Node::new(
                 NodeKind::Num,
-                inf,
-                inf,
+                INF,
+                INF,
                 Some(self.tokens[self.read].expect_number(&mut self.read)),
                 0,
             );
