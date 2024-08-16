@@ -3,7 +3,7 @@ assert(){
     expected="$1"
     input="$2"
 
-    cargo run -- "$input" > tmp.s 2> /dev/null
+    ./target/debug/nine_cc "$input" > tmp.s 2> /dev/null
     clang -masm=intel -o tmp tmp.s
 
     ./tmp
@@ -16,6 +16,9 @@ assert(){
         exit 1
     fi
 }
+
+# ビルドする
+cargo build
 
 assert 0 0
 assert 42 42
@@ -42,4 +45,4 @@ assert 1 '2 >= 2'
 assert 0 '2 >= 3'
 
 
-echo "All test passed"
+echo "All test passed🎉"
