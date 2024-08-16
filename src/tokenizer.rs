@@ -1,17 +1,20 @@
+use std::fmt::format;
+
 use crate::utils::{error_at, strtol, USER_INPUT};
 use itertools::Itertools;
 
 #[derive(Debug, PartialEq)]
-enum TokenKind {
+pub enum TokenKind {
     TkReserved,
+    TkIdent,
     TkNum,
 }
 
 #[derive(Debug)]
 pub struct Token {
-    kind: TokenKind,
+    pub kind: TokenKind,
     val: Option<i32>,
-    str: String,
+    pub str: String,
 }
 
 impl Token {
@@ -56,7 +59,7 @@ pub fn tokenize(p: &[char]) -> Vec<Token> {
     let mut idx = 0;
     while idx < p.len() {
         match p[idx] {
-            '+' | '-' | '*' | '/' | '(' | ')' => {
+            '+' | '-' | '*' | '/' | '(' | ')' | ';' => {
                 let new_token = Token::new(TokenKind::TkReserved, format!("{}", p[idx]));
                 tokens.push(new_token);
                 idx += 1;
@@ -85,6 +88,11 @@ pub fn tokenize(p: &[char]) -> Vec<Token> {
                     idx += 1;
                 }
             }
+            'a'..='z' => {
+                let new_token = Token::new(TokenKind::TkIdent, format!("{}", p[idx]));
+                tokens.push(new_token);
+                idx += 1;
+            }
             _ => {
                 let user_input = USER_INPUT.lock().unwrap().clone();
                 error_at(
@@ -96,5 +104,7 @@ pub fn tokenize(p: &[char]) -> Vec<Token> {
             }
         }
     }
+
+    eprintln!("[{}]\n", tokens.iter().map(|tkn| format!("{:?}", *tkn)).join(",\n"));
     tokens
 }

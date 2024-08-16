@@ -22,11 +22,18 @@ fn main() {
     println!(".globl _main");
     println!("_main:");
 
+    // スタックフレーム宣言
+    println!("  push rbp");
+    println!("  mov rbp, rsp");
+    println!("  sub rsp, {}", 8*26);
+
     let tokens = tokenize(&p);
     let mut node_tree = NodeTree::new(tokens);
     node_tree.parse();
 
-    // スタックトップの値を関数からの戻り値とする
-    println!("  pop rax");
+    // 最後に評価した値がpopされてraxに残っているので、
+    // スタックフレームを以前の状態に戻して終了する
+    println!("  mov rsp, rbp");
+    println!("  pop rbp");
     println!("  ret");
 }
