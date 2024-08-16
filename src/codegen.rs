@@ -36,7 +36,7 @@ impl Node {
             lhs,
             rhs,
             val,
-            offset
+            offset,
         }
     }
 }
@@ -115,9 +115,8 @@ impl NodeTree {
                 println!("  push rdi");
                 return;
             }
-            _ => { }
+            _ => {}
         }
-
 
         self.generate(self.nodes[loc].lhs);
         self.generate(self.nodes[loc].rhs);
@@ -287,13 +286,7 @@ impl NodeTree {
             let inf = 1e10 as usize;
             let zero_node = Node::new(NodeKind::Num, inf, inf, Some(0), 0);
             self.nodes.push(zero_node);
-            let new_node = Node::new(
-                NodeKind::Sub,
-                self.nodes.len() - 1,
-                self.primary(),
-                None,
-                0,
-            );
+            let new_node = Node::new(NodeKind::Sub, self.nodes.len() - 1, self.primary(), None, 0);
             self.nodes.push(new_node);
             return self.nodes.len() - 1;
         }
@@ -311,7 +304,7 @@ impl NodeTree {
         // 実装ミスっていたら配列外参照で落ちるようにしておく
         let inf = 1e10 as usize;
 
-        if self.tokens[self.read].kind == TokenKind::TkIdent {
+        if self.tokens[self.read].kind == TokenKind::Ident {
             // 変数の場合
             let var_name = self.tokens[self.read].str.clone();
             let offset = match self.vars.get(&var_name) {
@@ -323,13 +316,7 @@ impl NodeTree {
                     new_var.offset
                 }
             };
-            let new_node = Node::new(
-                NodeKind::LocalVar,
-                inf,
-                inf,
-                None,
-                offset,
-            );
+            let new_node = Node::new(NodeKind::LocalVar, inf, inf, None, offset);
             self.read += 1; // TODO: ここもっといい実装ある気がするけど一旦放置で
             self.nodes.push(new_node);
         } else {

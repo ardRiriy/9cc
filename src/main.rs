@@ -1,11 +1,11 @@
+use codegen::NodeTree;
 use tokenizer::tokenize;
 use utils::{get_args, USER_INPUT};
-use codegen::NodeTree;
 
-mod tokenizer;
 mod codegen;
-mod utils;
 mod localvar;
+mod tokenizer;
+mod utils;
 
 fn main() {
     let p = match get_args() {
@@ -22,7 +22,6 @@ fn main() {
     println!(".intel_syntax noprefix");
     println!(".globl _main");
     println!("_main:");
-
 
     let tokens = tokenize(&p);
     let mut node_tree = NodeTree::new(tokens);

@@ -1,6 +1,6 @@
 use itertools::Itertools;
-use std::sync::Mutex;
 use std::env;
+use std::sync::Mutex;
 
 lazy_static::lazy_static! {
     pub static ref USER_INPUT: Mutex<String> = Mutex::new(String::new());
