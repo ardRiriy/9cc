@@ -1,6 +1,6 @@
+use itertools::Itertools;
 use std::env;
 use std::sync::Mutex;
-use itertools::Itertools;
 
 lazy_static::lazy_static! {
     static ref USER_INPUT: Mutex<String> = Mutex::new(String::new());
@@ -21,7 +21,11 @@ struct Token {
 
 impl Token {
     fn new(kind: TokenKind, str: String) -> Token {
-        Token { kind, val: None, str}
+        Token {
+            kind,
+            val: None,
+            str,
+        }
     }
 
     fn expect_number(&self, idx: &mut usize) -> i32 {
@@ -52,55 +56,47 @@ impl Token {
     }
 }
 
-fn tokenize(p: &Vec<char>) -> Vec<Token> {
+fn tokenize(p: &[char]) -> Vec<Token> {
     let mut tokens = vec![];
     let mut idx = 0;
     while idx < p.len() {
         match p[idx] {
             '+' | '-' | '*' | '/' | '(' | ')' => {
-                let new_token = Token::new(
-                    TokenKind::TkReserved,
-                    format!("{}", p[idx]),
-                );
+                let new_token = Token::new(TokenKind::TkReserved, format!("{}", p[idx]));
                 tokens.push(new_token);
                 idx += 1;
-            },
+            }
             ' ' => {
                 // 空白はskipする
                 idx += 1;
             }
             '0'..='9' => {
                 let num = strtol(p, &mut idx);
-                let mut new_token = Token::new(
-                    TokenKind::TkNum,
-                    num.to_string()
-                );
+                let mut new_token = Token::new(TokenKind::TkNum, num.to_string());
                 new_token.val = Some(num);
                 tokens.push(new_token);
             }
-            '<' | '=' | '>' | '!'  => {
+            '<' | '=' | '>' | '!' => {
                 if idx + 1 < p.len() {
-                    if p[idx+1] == '=' {
-                        let op = p[idx..=idx+1].iter().join("");
-                        let new_token = Token::new(
-                            TokenKind::TkReserved,
-                            op
-                        );
+                    if p[idx + 1] == '=' {
+                        let op = p[idx..=idx + 1].iter().join("");
+                        let new_token = Token::new(TokenKind::TkReserved, op);
                         tokens.push(new_token);
                         idx += 2;
                         continue;
                     }
-                    let new_token = Token::new(
-                        TokenKind::TkReserved,
-                        format!("{}", p[idx])
-                    );
+                    let new_token = Token::new(TokenKind::TkReserved, format!("{}", p[idx]));
                     tokens.push(new_token);
                     idx += 1;
                 }
             }
             _ => {
                 let user_input = USER_INPUT.lock().unwrap().clone();
-                error_at(idx, user_input, &format!("予期しない文字です: '{}'", p[idx]));
+                error_at(
+                    idx,
+                    user_input,
+                    &format!("予期しない文字です: '{}'", p[idx]),
+                );
                 panic!();
             }
         }
@@ -131,19 +127,28 @@ struct Node {
 
 impl Node {
     fn new(kind: NodeKind, lhs: usize, rhs: usize, val: Option<i32>) -> Node {
-        Node { kind, lhs, rhs, val }
+        Node {
+            kind,
+            lhs,
+            rhs,
+            val,
+        }
     }
 }
 
 struct NodeTree {
     tokens: Vec<Token>,
     read: usize, // 読んだトークン数
-    node_tree: Vec<Node>
+    node_tree: Vec<Node>,
 }
 
 impl NodeTree {
     fn new(tokens: Vec<Token>) -> NodeTree {
-        NodeTree { tokens, node_tree: vec![], read: 0 }
+        NodeTree {
+            tokens,
+            node_tree: vec![],
+            read: 0,
+        }
     }
 
     fn parse(&mut self) {
@@ -165,32 +170,32 @@ impl NodeTree {
         match self.node_tree[loc].kind {
             NodeKind::Add => {
                 println!("  add rax, rdi");
-            },
+            }
             NodeKind::Sub => {
                 println!("  sub rax, rdi");
-            },
+            }
             NodeKind::Mul => {
                 println!("  imul rax, rdi");
-            },
+            }
             NodeKind::Div => {
                 println!("  cqo");
                 println!("  idiv rdi");
-            },
+            }
             NodeKind::Eq => {
                 println!("  cmp rax, rdi");
                 println!("  sete al");
                 println!("  movzx rax, al");
-            },
+            }
             NodeKind::Nq => {
                 println!("  cmp rax, rdi");
                 println!("  setne al");
                 println!("  movzx rax, al");
-            },
+            }
             NodeKind::Lt => {
                 println!("  cmp rax, rdi");
                 println!("  setl al");
                 println!("  movzx rax, al");
-            },
+            }
             NodeKind::Le => {
                 println!("  cmp rax, rdi");
                 println!("  setle al");
@@ -214,21 +219,11 @@ impl NodeTree {
 
         while self.read < self.tokens.len() {
             if self.tokens[self.read].consume(&mut self.read, "==") {
-                let new_node = Node::new(
-                    NodeKind::Eq,
-                    node,
-                    self.relational(),
-                    None
-                );
+                let new_node = Node::new(NodeKind::Eq, node, self.relational(), None);
                 self.node_tree.push(new_node);
                 node = self.node_tree.len() - 1;
             } else if self.tokens[self.read].consume(&mut self.read, "!=") {
-                let new_node = Node::new(
-                    NodeKind::Nq,
-                    node,
-                    self.relational(),
-                    None
-                );
+                let new_node = Node::new(NodeKind::Nq, node, self.relational(), None);
                 self.node_tree.push(new_node);
                 node = self.node_tree.len() - 1;
             } else {
@@ -244,40 +239,20 @@ impl NodeTree {
 
         while self.read < self.tokens.len() {
             if self.tokens[self.read].consume(&mut self.read, "<") {
-                let new_node = Node::new(
-                    NodeKind::Lt,
-                    node,
-                    self.add(),
-                    None
-                );
+                let new_node = Node::new(NodeKind::Lt, node, self.add(), None);
                 self.node_tree.push(new_node);
                 node = self.node_tree.len() - 1;
             } else if self.tokens[self.read].consume(&mut self.read, "<=") {
-                let new_node = Node::new(
-                    NodeKind::Le,
-                    node,
-                    self.add(),
-                    None
-                );
+                let new_node = Node::new(NodeKind::Le, node, self.add(), None);
                 self.node_tree.push(new_node);
                 node = self.node_tree.len() - 1;
             } else if self.tokens[self.read].consume(&mut self.read, ">") {
                 // 左辺と右辺を入れ替えて評価することでgenの実装量が減って嬉しい(>= も同様)
-                let new_node = Node::new(
-                    NodeKind::Lt,
-                    self.add(),
-                    node,
-                    None
-                );
+                let new_node = Node::new(NodeKind::Lt, self.add(), node, None);
                 self.node_tree.push(new_node);
                 node = self.node_tree.len() - 1;
             } else if self.tokens[self.read].consume(&mut self.read, ">=") {
-                let new_node = Node::new(
-                    NodeKind::Le,
-                    self.add(),
-                    node,
-                    None
-                );
+                let new_node = Node::new(NodeKind::Le, self.add(), node, None);
                 self.node_tree.push(new_node);
                 node = self.node_tree.len() - 1;
             } else {
@@ -285,29 +260,25 @@ impl NodeTree {
             }
         }
 
-        return node;
+        node
     }
 
     fn add(&mut self) -> usize {
         let mut node = self.mul();
         while self.read < self.tokens.len() {
             if self.tokens[self.read].consume(&mut self.read, "+") {
-                let new_node = Node::new(
-                    NodeKind::Add,
-                    node,
-                    self.mul(),
-                    None
-                );
+                let new_node = Node::new(NodeKind::Add, node, self.mul(), None);
                 self.node_tree.push(new_node);
-                eprintln!("{}\n", self.node_tree.iter().map(|node| format!("{:?}", *node)).join(",\n"));
+                eprintln!(
+                    "{}\n",
+                    self.node_tree
+                        .iter()
+                        .map(|node| format!("{:?}", *node))
+                        .join(",\n")
+                );
                 node = self.node_tree.len() - 1;
             } else if self.tokens[self.read].consume(&mut self.read, "-") {
-                let new_node = Node::new(
-                    NodeKind::Sub,
-                    node,
-                    self.mul(),
-                    None
-                );
+                let new_node = Node::new(NodeKind::Sub, node, self.mul(), None);
                 self.node_tree.push(new_node);
                 node = self.node_tree.len() - 1;
             } else {
@@ -321,21 +292,11 @@ impl NodeTree {
         let mut node = self.unary();
         while self.read < self.tokens.len() {
             if self.tokens[self.read].consume(&mut self.read, "*") {
-                let new_node = Node::new(
-                    NodeKind::Mul,
-                    node,
-                    self.unary(),
-                    None,
-                );
+                let new_node = Node::new(NodeKind::Mul, node, self.unary(), None);
                 self.node_tree.push(new_node);
                 node = self.node_tree.len() - 1;
             } else if self.tokens[self.read].consume(&mut self.read, "/") {
-                let new_node = Node::new(
-                    NodeKind::Div,
-                    node,
-                    self.unary(),
-                    None,
-                );
+                let new_node = Node::new(NodeKind::Div, node, self.unary(), None);
                 self.node_tree.push(new_node);
                 node = self.node_tree.len() - 1;
             } else {
@@ -355,15 +316,15 @@ impl NodeTree {
             self.node_tree.push(zero_node);
             let new_node = Node::new(
                 NodeKind::Sub,
-                self.node_tree.len()-1,
+                self.node_tree.len() - 1,
                 self.primary(),
-                None
+                None,
             );
             self.node_tree.push(new_node);
             return self.node_tree.len() - 1;
         }
 
-        return self.primary();
+        self.primary()
     }
 
     fn primary(&mut self) -> usize {
@@ -379,14 +340,19 @@ impl NodeTree {
             NodeKind::Num,
             inf,
             inf,
-            Some(self.tokens[self.read].expect_number(&mut self.read))
+            Some(self.tokens[self.read].expect_number(&mut self.read)),
         );
         self.node_tree.push(new_node);
-        eprintln!("{}\n", self.node_tree.iter().map(|node| format!("{:?}", *node)).join(",\n"));
-        return self.node_tree.len() - 1;
+        eprintln!(
+            "{}\n",
+            self.node_tree
+                .iter()
+                .map(|node| format!("{:?}", *node))
+                .join(",\n")
+        );
+        self.node_tree.len() - 1
     }
 }
-
 
 // p[idx]から違う記号が出てくるまでを数字として返す
 fn strtol(p: &[char], idx: &mut usize) -> i32 {
@@ -395,7 +361,7 @@ fn strtol(p: &[char], idx: &mut usize) -> i32 {
         match p[*idx] {
             '0'..='9' => {
                 num = num * 10 + (p[*idx] as i32 - '0' as i32);
-            },
+            }
             _ => {
                 break;
             }
@@ -406,7 +372,7 @@ fn strtol(p: &[char], idx: &mut usize) -> i32 {
 }
 
 fn get_args() -> Result<Vec<String>, String> {
-    let args :Vec<String> = env::args().collect();
+    let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         return Err(String::from("引数の個数が正しくありません"));
     }
@@ -419,8 +385,10 @@ fn main() {
             let mut user_input = USER_INPUT.lock().unwrap();
             *user_input = v[1].clone();
             v[1].chars().collect::<Vec<char>>()
-        },
-        Err(msg) => {panic!("{}", msg);}
+        }
+        Err(msg) => {
+            panic!("{}", msg);
+        }
     };
 
     println!(".intel_syntax noprefix");
@@ -438,9 +406,6 @@ fn main() {
 
 fn error_at(idx: usize, user_input: String, reason: &str) {
     eprintln!("{}", user_input);
-    eprintln!("{}^ {}",
-        (0..idx).map(|_| " ").join(""),
-        reason
-    );
+    eprintln!("{}^ {}", (0..idx).map(|_| " ").join(""), reason);
     panic!();
 }
