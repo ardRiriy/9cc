@@ -1,5 +1,8 @@
+use std::collections::BTreeMap;
+
 use itertools::Itertools;
 
+use crate::localvar::LVar;
 use crate::tokenizer::{Token, TokenKind};
 
 #[derive(Debug, PartialEq)]
@@ -43,7 +46,9 @@ pub struct NodeTree {
     tokens: Vec<Token>,
     read: usize, // 読んだトークン数
     nodes: Vec<Node>,
-    start_nodes: Vec<usize> // 式の始まりのトークンのindexを保存
+    start_nodes: Vec<usize>, // 式の始まりのトークンのindexを保存
+    vars: BTreeMap<String, LVar>,
+    pub offset: usize,
 }
 
 impl NodeTree {
@@ -53,13 +58,24 @@ impl NodeTree {
             nodes: Vec::new(),
             read: 0,
             start_nodes: Vec::new(),
+            vars: BTreeMap::new(),
+            offset: 8,
         }
     }
 
     pub fn parse(&mut self) {
         self.program();
 
+        // スタックフレーム宣言
+        println!("  push rbp");
+        println!("  mov rbp, rsp");
+        println!("  sub rsp, {}", self.offset);
+        // eprintln!("[{}]\n",
+        //     self.nodes.iter().enumerate().map(|(idx, node)| format!("{idx}: {:?}", *node)).join("\n")
+        // );
+
         for &loc in &self.start_nodes.clone() {
+            // eprintln!("start at: {loc}");
             self.generate(loc);
             println!("  pop rax"); // 最後に評価した値がスタックに残るので、popしておく
         }
@@ -296,14 +312,23 @@ impl NodeTree {
         let inf = 1e10 as usize;
 
         if self.tokens[self.read].kind == TokenKind::TkIdent {
-            let char = self.tokens[self.read].str.chars().into_iter().collect_vec()[0];
             // 変数の場合
+            let var_name = self.tokens[self.read].str.clone();
+            let offset = match self.vars.get(&var_name) {
+                Some(val) => val.offset,
+                None => {
+                    let new_var = LVar::new(var_name.clone(), self.offset);
+                    self.vars.insert(var_name, new_var.clone());
+                    self.offset += 8;
+                    new_var.offset
+                }
+            };
             let new_node = Node::new(
                 NodeKind::LocalVar,
                 inf,
                 inf,
                 None,
-                (char as usize - 'a' as usize + 1) * 8
+                offset,
             );
             self.read += 1; // TODO: ここもっといい実装ある気がするけど一旦放置で
             self.nodes.push(new_node);

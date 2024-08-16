@@ -5,6 +5,7 @@ use codegen::NodeTree;
 mod tokenizer;
 mod codegen;
 mod utils;
+mod localvar;
 
 fn main() {
     let p = match get_args() {
@@ -22,13 +23,10 @@ fn main() {
     println!(".globl _main");
     println!("_main:");
 
-    // スタックフレーム宣言
-    println!("  push rbp");
-    println!("  mov rbp, rsp");
-    println!("  sub rsp, {}", 8*26);
 
     let tokens = tokenize(&p);
     let mut node_tree = NodeTree::new(tokens);
+
     node_tree.parse();
 
     // 最後に評価した値がpopされてraxに残っているので、

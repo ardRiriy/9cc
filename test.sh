@@ -43,6 +43,7 @@ assert 0 '2 > 3;'
 assert 1 '2 >= 1;'
 assert 1 '2 >= 2;'
 assert 0 '2 >= 3;'
-
+assert 6 'a=2;b=3;2*3;'
+assert 6 'foo=4;bar=3;foo*bar/2;'
 
 echo "All test passed🎉"

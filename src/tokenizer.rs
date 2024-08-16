@@ -88,10 +88,19 @@ pub fn tokenize(p: &[char]) -> Vec<Token> {
                     idx += 1;
                 }
             }
-            'a'..='z' => {
-                let new_token = Token::new(TokenKind::TkIdent, format!("{}", p[idx]));
+            'a'..='z' | 'A'..='Z' | '_' => {
+                let mut last = idx+1;
+                while last < p.len() && (
+                    ('a'..='z').contains(&p[last]) ||('A'..='Z').contains(&p[last]) || p[last] == '_') {
+                        last += 1;
+                }
+                let var = p[idx..last].into_iter().collect::<String>();
+                let new_token = Token::new(
+                    TokenKind::TkIdent,
+                    format!("{}", var)
+                );
                 tokens.push(new_token);
-                idx += 1;
+                idx = last;
             }
             _ => {
                 let user_input = USER_INPUT.lock().unwrap().clone();
